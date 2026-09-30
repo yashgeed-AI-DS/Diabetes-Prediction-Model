@@ -10,6 +10,8 @@ so they do not have to be directly beside app.py.
 """
 
 import time
+import sys
+import importlib.util
 from pathlib import Path
 import pickle
 
@@ -26,6 +28,35 @@ st.set_page_config(
     page_icon="🩺",
     layout="wide"
 )
+
+
+# ============================================================
+# DEBUG / DEPENDENCY CHECK
+# ============================================================
+
+# Temporary diagnostic to check the deployment environment.
+# This helps identify the "No module named 'sklearn'" error.
+
+SKLEARN_SPEC = importlib.util.find_spec("sklearn")
+
+if SKLEARN_SPEC is None:
+    st.warning(
+        "⚠️ scikit-learn is NOT available in the current environment."
+    )
+else:
+    st.success(
+        "✅ scikit-learn is available."
+    )
+
+# You can see the exact Python version and sklearn status
+# while troubleshooting the deployment.
+with st.expander("🔧 Deployment Debug Information"):
+
+    st.write("**Python version:**")
+    st.code(sys.version)
+
+    st.write("**sklearn available:**")
+    st.code(str(SKLEARN_SPEC))
 
 
 # ============================================================
@@ -80,11 +111,17 @@ def load_artifacts():
     # --------------------------------------------------------
 
     if model_path is None:
-        st.error("❌ Logistic Regression model file was not found.")
 
-        st.write("### Files available in the application folder:")
+        st.error(
+            "❌ Logistic Regression model file was not found."
+        )
+
+        st.write(
+            "### Files available in the application folder:"
+        )
 
         try:
+
             files = [
                 str(p.relative_to(BASE))
                 for p in BASE.rglob("*")
@@ -106,11 +143,17 @@ def load_artifacts():
     # --------------------------------------------------------
 
     if scaler_path is None:
-        st.error("❌ Scaler file was not found.")
 
-        st.write("### Files available in the application folder:")
+        st.error(
+            "❌ Scaler file was not found."
+        )
+
+        st.write(
+            "### Files available in the application folder:"
+        )
 
         try:
+
             files = [
                 str(p.relative_to(BASE))
                 for p in BASE.rglob("*")
@@ -128,6 +171,35 @@ def load_artifacts():
         st.stop()
 
     # --------------------------------------------------------
+    # Display artifact paths during debugging
+    # --------------------------------------------------------
+
+    with st.expander("📁 Model File Information"):
+
+        st.write("**Model path:**")
+        st.code(str(model_path))
+
+        st.write("**Scaler path:**")
+        st.code(str(scaler_path))
+
+    # --------------------------------------------------------
+    # Check scikit-learn before loading pickle
+    # --------------------------------------------------------
+
+    if SKLEARN_SPEC is None:
+
+        st.error(
+            "❌ scikit-learn is not installed in the deployment environment."
+        )
+
+        st.info(
+            "Add 'scikit-learn' to requirements.txt and redeploy "
+            "the application."
+        )
+
+        st.stop()
+
+    # --------------------------------------------------------
     # Load model
     # --------------------------------------------------------
 
@@ -136,10 +208,34 @@ def load_artifacts():
         with model_path.open("rb") as file:
             model = pickle.load(file)
 
+    except ModuleNotFoundError as e:
+
+        st.error(
+            "❌ A Python dependency required by the Logistic "
+            "Regression model is missing."
+        )
+
+        st.code(
+            f"ModuleNotFoundError: {e}"
+        )
+
+        st.info(
+            "Make sure the package required by the model is "
+            "included in requirements.txt."
+        )
+
+        st.stop()
+
     except Exception as e:
 
-        st.error("❌ Error while loading Logistic Regression model.")
-        st.code(str(e))
+        st.error(
+            "❌ Error while loading Logistic Regression model."
+        )
+
+        st.code(
+            f"{type(e).__name__}: {e}"
+        )
+
         st.stop()
 
     # --------------------------------------------------------
@@ -151,10 +247,32 @@ def load_artifacts():
         with scaler_path.open("rb") as file:
             scaler = pickle.load(file)
 
+    except ModuleNotFoundError as e:
+
+        st.error(
+            "❌ A Python dependency required by the scaler is missing."
+        )
+
+        st.code(
+            f"ModuleNotFoundError: {e}"
+        )
+
+        st.info(
+            "Check the packages listed in requirements.txt."
+        )
+
+        st.stop()
+
     except Exception as e:
 
-        st.error("❌ Error while loading scaler.")
-        st.code(str(e))
+        st.error(
+            "❌ Error while loading scaler."
+        )
+
+        st.code(
+            f"{type(e).__name__}: {e}"
+        )
+
         st.stop()
 
     # --------------------------------------------------------
@@ -185,6 +303,10 @@ def load_artifacts():
 
     return model, scaler
 
+
+# ============================================================
+# LOAD MODEL AND SCALER
+# ============================================================
 
 model, scaler = load_artifacts()
 
@@ -721,7 +843,9 @@ with left:
             unsafe_allow_html=True
         )
 
-        st.markdown("## Patient health information")
+        st.markdown(
+            "## Patient health information"
+        )
 
         st.markdown(
             """
@@ -814,7 +938,9 @@ with left:
 
     if go:
 
-        with st.spinner("Analysing your health data…"):
+        with st.spinner(
+            "Analysing your health data…"
+        ):
 
             time.sleep(0.9)
 
@@ -824,8 +950,13 @@ with left:
 
             except Exception as e:
 
-                st.error("Prediction failed.")
-                st.code(str(e))
+                st.error(
+                    "Prediction failed."
+                )
+
+                st.code(
+                    f"{type(e).__name__}: {e}"
+                )
 
 
 # ============================================================
