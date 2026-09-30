@@ -101,27 +101,25 @@ def load_artifacts():
     """
     Locate and load the trained Logistic Regression model
     and StandardScaler.
+
+    Supports both:
+    - pickle files created with pickle.dump()
+    - joblib files created with joblib.dump()
     """
 
     model_path = find_file(MODEL_FILENAME)
     scaler_path = find_file(SCALER_FILENAME)
 
-    # --------------------------------------------------------
-    # Check model
-    # --------------------------------------------------------
+    # ========================================================
+    # CHECK MODEL FILE
+    # ========================================================
 
     if model_path is None:
+        st.error("❌ Logistic Regression model file was not found.")
 
-        st.error(
-            "❌ Logistic Regression model file was not found."
-        )
-
-        st.write(
-            "### Files available in the application folder:"
-        )
+        st.write("### Files available in the application folder:")
 
         try:
-
             files = [
                 str(p.relative_to(BASE))
                 for p in BASE.rglob("*")
@@ -138,22 +136,16 @@ def load_artifacts():
 
         st.stop()
 
-    # --------------------------------------------------------
-    # Check scaler
-    # --------------------------------------------------------
+    # ========================================================
+    # CHECK SCALER FILE
+    # ========================================================
 
     if scaler_path is None:
+        st.error("❌ Scaler file was not found.")
 
-        st.error(
-            "❌ Scaler file was not found."
-        )
-
-        st.write(
-            "### Files available in the application folder:"
-        )
+        st.write("### Files available in the application folder:")
 
         try:
-
             files = [
                 str(p.relative_to(BASE))
                 for p in BASE.rglob("*")
@@ -170,136 +162,158 @@ def load_artifacts():
 
         st.stop()
 
-    # --------------------------------------------------------
-    # Display artifact paths during debugging
-    # --------------------------------------------------------
+    # ========================================================
+    # FILE INFORMATION
+    # ========================================================
 
     with st.expander("📁 Model File Information"):
 
         st.write("**Model path:**")
         st.code(str(model_path))
 
+        st.write("**Model size:**")
+        st.code(f"{model_path.stat().st_size:,} bytes")
+
         st.write("**Scaler path:**")
         st.code(str(scaler_path))
 
-    # --------------------------------------------------------
-    # Check scikit-learn before loading pickle
-    # --------------------------------------------------------
+        st.write("**Scaler size:**")
+        st.code(f"{scaler_path.stat().st_size:,} bytes")
+
+    # ========================================================
+    # CHECK SCIKIT-LEARN
+    # ========================================================
 
     if SKLEARN_SPEC is None:
-
         st.error(
             "❌ scikit-learn is not installed in the deployment environment."
         )
 
         st.info(
-            "Add 'scikit-learn' to requirements.txt and redeploy "
-            "the application."
+            "Make sure requirements.txt contains scikit-learn "
+            "and redeploy the application."
         )
 
         st.stop()
 
-    # --------------------------------------------------------
-    # Load model
-    # --------------------------------------------------------
+    # ========================================================
+    # LOAD MODEL
+    # ========================================================
 
     try:
 
+        # First try normal pickle
         with model_path.open("rb") as file:
             model = pickle.load(file)
 
-    except ModuleNotFoundError as e:
+    except Exception as pickle_error:
 
-        st.error(
-            "❌ A Python dependency required by the Logistic "
-            "Regression model is missing."
-        )
+        # If pickle fails, try joblib
+        try:
+            model = joblib.load(model_path)
 
-        st.code(
-            f"ModuleNotFoundError: {e}"
-        )
+        except Exception as joblib_error:
 
-        st.info(
-            "Make sure the package required by the model is "
-            "included in requirements.txt."
-        )
+            st.error("❌ Unable to load the Logistic Regression model.")
 
-        st.stop()
+            st.write("### Pickle loading error:")
+            st.code(
+                f"{type(pickle_error).__name__}: {pickle_error}"
+            )
 
-    except Exception as e:
+            st.write("### Joblib loading error:")
+            st.code(
+                f"{type(joblib_error).__name__}: {joblib_error}"
+            )
 
-        st.error(
-            "❌ Error while loading Logistic Regression model."
-        )
+            st.warning(
+                "The model file may be corrupted or may not have been "
+                "created using pickle.dump() or joblib.dump()."
+            )
 
-        st.code(
-            f"{type(e).__name__}: {e}"
-        )
+            st.info(
+                "Regenerate logistic_regression_model.pkl from your "
+                "training notebook and upload the new file to GitHub."
+            )
 
-        st.stop()
+            st.stop()
 
-    # --------------------------------------------------------
-    # Load scaler
-    # --------------------------------------------------------
+    # ========================================================
+    # LOAD SCALER
+    # ========================================================
 
     try:
 
         with scaler_path.open("rb") as file:
             scaler = pickle.load(file)
 
-    except ModuleNotFoundError as e:
+    except Exception as pickle_error:
 
-        st.error(
-            "❌ A Python dependency required by the scaler is missing."
-        )
+        try:
+            scaler = joblib.load(scaler_path)
 
-        st.code(
-            f"ModuleNotFoundError: {e}"
-        )
+        except Exception as joblib_error:
 
-        st.info(
-            "Check the packages listed in requirements.txt."
-        )
+            st.error("❌ Unable to load the scaler.")
 
-        st.stop()
+            st.write("### Pickle loading error:")
+            st.code(
+                f"{type(pickle_error).__name__}: {pickle_error}"
+            )
 
-    except Exception as e:
+            st.write("### Joblib loading error:")
+            st.code(
+                f"{type(joblib_error).__name__}: {joblib_error}"
+            )
 
-        st.error(
-            "❌ Error while loading scaler."
-        )
+            st.warning(
+                "The scaler file may be corrupted or saved using "
+                "a different serialization method."
+            )
 
-        st.code(
-            f"{type(e).__name__}: {e}"
-        )
+            st.stop()
 
-        st.stop()
-
-    # --------------------------------------------------------
-    # Validate model
-    # --------------------------------------------------------
+    # ========================================================
+    # VALIDATE MODEL
+    # ========================================================
 
     if not hasattr(model, "predict_proba"):
 
         st.error(
-            "❌ logistic_regression_model.pkl does not contain "
-            "a classification model with predict_proba()."
+            "❌ The loaded model does not have predict_proba()."
         )
+
+        st.write("Loaded object type:")
+        st.code(str(type(model)))
 
         st.stop()
 
-    # --------------------------------------------------------
-    # Validate scaler
-    # --------------------------------------------------------
+    # ========================================================
+    # VALIDATE SCALER
+    # ========================================================
 
     if not hasattr(scaler, "transform"):
 
         st.error(
-            "❌ scaler.pkl does not contain a valid scaler "
-            "with transform()."
+            "❌ The loaded scaler does not have transform()."
         )
 
+        st.write("Loaded object type:")
+        st.code(str(type(scaler)))
+
         st.stop()
+
+    # ========================================================
+    # SHOW SUCCESS
+    # ========================================================
+
+    with st.expander("✅ Loaded Artifact Details"):
+
+        st.write("**Model type:**")
+        st.code(str(type(model)))
+
+        st.write("**Scaler type:**")
+        st.code(str(type(scaler)))
 
     return model, scaler
 
